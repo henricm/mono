@@ -50,6 +50,12 @@ namespace System.Net.Sockets {
 			Socket.Shutdown_internal (handle, SocketShutdown.Both, out error);
 #endif
 
+			// It's not possible to interrupt a blocking socket operation
+			// on Windows. Only option is to close the socket which will wake up
+			// blocking threads.
+			if (Environment.IsRunningOnWindows)
+				Socket.Close_internal (handle, out error);
+
 			if (blocking_threads != null) {
 				lock (blocking_threads) {
 					int abort_attempts = 0;
