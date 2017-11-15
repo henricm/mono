@@ -82,7 +82,7 @@ $(test_nunit_dep): $(topdir)/build/deps/nunit-$(PROFILE).stamp
 
 $(topdir)/build/deps/nunit-$(PROFILE).stamp:
 ifndef PARENT_PROFILE
-	cd ${topdir}/tools/nunit-lite && $(MAKE)
+	cd ${topdir}/tools/nunit-lite && $(MAKE) V=1
 endif
 	echo "stamp" >$@
 

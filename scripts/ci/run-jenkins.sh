@@ -83,22 +83,48 @@ if [[ ${CI_TAGS} != *'mac-sdk'* ]]; # Mac SDK builds Mono itself
 	then
 	${TESTCMD} --label=configure --timeout=60m --fatal ./autogen.sh $EXTRA_CONF_FLAGS
 fi
+if [[ ${label} == w* ]];
+    then
+    VSWHERE_EXE="/cygdrive/c/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
+    if [[ -f "$VSWHERE_EXE" ]];
+        then
+        VSINSTALLDIR="$(cygpath "$("$VSWHERE_EXE" -latest -requires 'Microsoft.Component.MSBuild' -property installationPath -format value | tr -d '\r')")"
+    fi
+    if [[ -f "$VSINSTALLDIR/MSBuild/15.0/Bin/MSBuild.exe" ]]; 
+        then
+        # VS2017 and MSBuild 15
+        MSBUILD_EXE="$VSINSTALLDIR/MSBuild/15.0/Bin/MSBuild.exe"
+        PLATFORM_TOOLSET="v141"
+        if [[ ${CI_TAGS} == *'winaot'* ]]; 
+            then
+            # The AOT compiler on Windows requires Visual Studio's clang.exe and link.exe in $PATH
+            # and we must make sure Visual Studio's link.exe comes before Cygwin's link.exe
+            export VC_ROOT="$VSINSTALLDIR/VC"
+            export CLANG2_VERSION=$(sed -n 1p "$VC_ROOT/Auxiliary/Build/Microsoft.ClangC2Version.default.txt" | sed 's/\s//g')
+            export VCTOOLS_VERSION=$(sed -n 1p "$VC_ROOT/Auxiliary/Build/Microsoft.VCToolsVersion.default.txt" | sed 's/\s//g')
+            export PATH="$VC_ROOT/Tools/ClangC2/$CLANG2_VERSION/bin/HostX64":"$VC_ROOT/Tools/MSVC/$VCTOOLS_VERSION/bin/HostX64/x64":$PATH
+        fi
+    else
+        # VS2015 and MSBuild 14
+        VSINSTALLDIR="/cygdrive/c/Program Files (x86)/Microsoft Visual Studio 14.0"
+        MSBUILD_EXE="/cygdrive/c/Program\ Files\ \(x86\)/MSBuild/14.0/Bin/MSBuild.exe"
+        PLATFORM_TOOLSET="v140"
+        if [[ ${CI_TAGS} == *'winaot'* ]];
+            then
+            export VC_ROOT="$VSINSTALLDIR/VC" 
+            export PATH="$VC_ROOT/ClangC2/bin/amd64:$VC_ROOT/bin/amd64":$PATH
+        fi
+    fi
+fi
+
 if [[ ${label} == 'w32' ]];
     then
 	# only build boehm on w32 (only windows platform supporting boehm).
-    ${TESTCMD} --label=make-msvc --timeout=60m --fatal /cygdrive/c/Program\ Files\ \(x86\)/MSBuild/14.0/Bin/MSBuild.exe /p:PlatformToolset=v140 /p:Platform=${PLATFORM} /p:Configuration=Release /p:MONO_TARGET_GC=boehm msvc/mono.sln
+    ${TESTCMD} --label=make-msvc --timeout=60m --fatal "$MSBUILD_EXE" /p:PlatformToolset=${PLATFORM_TOOLSET} /p:Platform=${PLATFORM} /p:Configuration=Release /p:MONO_TARGET_GC=boehm msvc/mono.sln
 fi
 if [[ ${label} == w* ]];
     then
-    ${TESTCMD} --label=make-msvc-sgen --timeout=60m --fatal /cygdrive/c/Program\ Files\ \(x86\)/MSBuild/14.0/Bin/MSBuild.exe /p:PlatformToolset=v140 /p:Platform=${PLATFORM} /p:Configuration=Release /p:MONO_TARGET_GC=sgen msvc/mono.sln
-fi
-
-if [[ ${CI_TAGS} == *'winaot'* ]];
-    then
-    # The AOT compiler on Windows requires Visual Studio's clang.exe and link.exe in $PATH
-    # and we must make sure Visual Studio's link.exe comes before Cygwin's link.exe
-    VC_ROOT="/cygdrive/c/Program Files (x86)/Microsoft Visual Studio 14.0/VC"
-    export PATH="$VC_ROOT/ClangC2/bin/amd64:$VC_ROOT/bin/amd64":$PATH
+    ${TESTCMD} --label=make-msvc-sgen --timeout=60m --fatal "$MSBUILD_EXE" /p:PlatformToolset=${PLATFORM_TOOLSET} /p:Platform=${PLATFORM} /p:Configuration=Release /p:MONO_TARGET_GC=sgen msvc/mono.sln
 fi
 
 if [[ ${CI_TAGS} == *'monolite'* ]]; then make get-monolite-latest; fi
@@ -138,5 +164,5 @@ elif [[ ${CI_TAGS} == *'no-tests'* ]];
     then
 	exit 0
 else
-	make check-ci
+	make V=1 check-ci
 fi

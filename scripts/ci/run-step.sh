@@ -1,4 +1,4 @@
-#!/bin/bash -e
+#!/bin/bash
 TIMEOUTCMD=`dirname "${BASH_SOURCE[0]}"`/babysitter
 if ! ${TIMEOUTCMD} -h >/dev/null 2>&1; then
     TIMEOUTCMD=timeout  # fall back to timeout if babysitter doesn't work (e.g. python not installed or wrong version)
